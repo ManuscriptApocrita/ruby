@@ -1,0 +1,25 @@
+прежде sudo pacman -Syu make; rvm pkg install openssl
+
+sudo pacman autoconf ##additional
+rvm install ruby-2.7.3 --with-openssl-dir=$HOME/.rvm/usr
+ 
+source ~/.rvm/scripts/rvm
+type rvm | head -n 1
+                                                                       
+rvm use ruby-2.7.3
+
+rvm list known — получить список всех версий ruby доступных для установки
+rvm install 1.9.1 – установить ruby версии 1.9.1
+rvm remove 1.9.2 – удалить ruby версии 1.9.2
+rvm use 1.9.2 — переключиться на ruby версии 1.9.2
+rvm use 1.9.2@rails3 --default — установить версию ruby 1.9.2 c gemset rails3 по умолчанию
+rvm use system — использовать системную версию ruby
+rvm list – список установленных версий ruby
+rvm gemset list – список gemset'ов в выбранной версии ruby
+rvm use 1.9.2@rails3 --create создать gemset rails3 для ruby версии 1.9.2
+rvm gemset export — экспортировать гемсет в файл default.gems
+rvm gemset import default.gems — установить gem's из списка в файле defaults.gem в текущий gemset
+
+rvmreset — перезагрузка RVM
+rvm uninstall — удалить одну или несколько версию Ruby, оставив исходники
+rvm implode — полностью удалить RVM (удаляет ВСЁ)

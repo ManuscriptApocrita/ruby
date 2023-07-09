@@ -1,0 +1,71 @@
+
+.background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    filter: blur(4px);
+}
+
+.background img {
+    /*pointer-events: none;*/
+    /*object-fit: cover;*/
+    height: 100%;
+    width: 100%;
+}
+
+.wrapper {
+    max-width: 800px;
+    width: 100%;
+}
+
+.navigationbar {
+    z-index: 1;
+    width: 100%;
+    position: absolute;
+    padding: 10px;
+    background-color: #FFA500;
+    color: #131515;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.container {
+    position: fixed;
+    left: 50%;
+    top: 45%;
+    transform: translate(-50%,-50%);
+    width: 500px;
+    background: #FEFCFF;
+    padding: 35px;
+}
+
+.item {
+    display: inline-block;
+    width: 55px;
+    height: 35px;
+    background-color: #ccc;
+    margin-right: 5px;
+    font-size: 30px;
+    border-radius: 5px;
+    text-align: center;
+}
+
+#calendar_body {
+    font-size: 24px;
+    border: 1px solid #131515;
+    height: 500px;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 2px;
+    overflow: auto
+}
+
+input[type="checkbox"] {
+    transform: scale(2);
+    display: inline-block;
+    margin-left: 20px;
+}

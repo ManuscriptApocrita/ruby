@@ -1,0 +1,13 @@
+/*  #application.css отвечает за стили приложения, далее сами стили
+ *= require reset
+ *
+ *= require font-awesome
+ *
+ *= require text
+ *= require layout
+ *= require spacing
+ *= require form
+ *= require button
+ *= require table
+ *= require message
+ */

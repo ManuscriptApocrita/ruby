@@ -1,0 +1,50 @@
+  <%=image_tag("pokemons.jpg", class: "background") %>
+
+  <%date = Date.today%>
+  <%beginning_of_week = date.beginning_of_week %>
+  <%end_of_week = date.end_of_week %>
+
+  <%week = (beginning_of_week..end_of_week).to_a %>
+
+  <div class="container" style="border: 2px solid #131515; border-radius: 10px">
+
+    <p class="title-md" style="text-align: center; font-size: 35px"> <%=(Time.new).strftime("%B").upcase %> </p>
+
+    <div style="text-align: center; margin-top: 10px; margin-bottom: 15px">
+      <%week.each do |element|%>
+        <%if element.day == (Time.new).day.to_i %>
+          <div class="item" style="background-color: #32CD32"> <%=element.day%></div>
+        <%else %>
+          <div class="item" style="background-color: #F0E68C"> <%=element.day%></div>
+        <%end %>
+      <% end %>
+    </div>
+
+    <div id="calendar_body">
+      <%tasks = Task.where(expiration_date: (Time.new).strftime("%Y-%m-%d"))%>
+      <%counter = 0 %>
+      <ul>
+      <%(tasks.size).times do%>
+        <li style="word-break: break-all; border: 10px">
+          <input type="checkbox" id="myCheckBox" style="margin: 15px"> <%="#{tasks[counter][:body]}"%>
+        </li>
+        <%counter += 1 %>
+      <% end %>
+      </ul>
+    </div>
+
+    <%if tasks.size == 0 %>
+      <%result = "nothing to do..." %>
+    <%else %>
+      <%result = tasks.size %>
+    <% end %>
+
+    <div style="display: flex">
+      <p style="margin-top: 15px; text-align: left; flex: 1"> <%= "Tasks on this day: #{result}" %> </p>
+      <p class="mt">
+        <%= button_to "Extended view", table_path, method: :get, class: "button button-main", style: "margin-top: 10px"%>
+      </p>
+    </div>
+
+  </div>
+</div>

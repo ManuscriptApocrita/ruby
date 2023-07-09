@@ -1,0 +1,68 @@
+<div class="background">
+  <%=image_tag("pokemons.jpg") %>
+</div>
+
+<div id="table_container">
+  <div style="width: 900px; margin-bottom: 15px">
+    <script async src="https://cse.google.com/cse.js?cx=54fb8eccee80946f2"></script>
+    <div class="gcse-search"></div>
+  </div>
+
+  <div style="display: flex; align-items: center; margin-bottom: 25px">
+    <div style="flex-grow: 1;">
+      <p style="text-align: left; font-size: 20px"><%= link_to "back", tasks_path %></p>
+    </div>
+    <p class="title-lg mb" style="text-align: center; margin: 0;">Table of tasks</p>
+    <div style="flex-grow: 1;"></div>
+  </div>
+
+  <%if @task.size == 0 %>
+    <p style="text-align: center; margin-top: 15px; margin-bottom: 25px"><%="Table will be create after inputting data" %></p>
+  <%else %>
+    <table style="word-break: break-all">
+      <tr>
+        <th>№</th>
+        <th>task text</th>
+        <th>expiration date</th>
+      </tr>
+
+      <%id_table = 1 %>
+      <%exception = Array.new %>
+      <%@task.each do |task|%>
+        <%if !exception.include?(task.expiration_date) %>
+          <tr>
+            <%examine_time = @task.where(expiration_date: task.expiration_date) %>
+
+            <td style="width: 25px">
+              <%="#{id_table}"%>
+              <%id_table += 1 %>
+            </td>
+
+            <td>
+              <%if (examine_time.size) > 1 %>
+                <%counter = 0 %>
+                <%examine_time.each do |item| %>
+                  <h4><%="* #{item[:body]}"%> <%= link_to fa_icon("pencil"), edit_task_path(item.id), title: "Change task", style: "font-size: 18px"%> <%= button_to fa_icon("trash-o"), task_path(item.id), method: :delete, title: "Delete task", style: "font-size: 18px"%> </h4>
+                  <%counter += 1 %>
+                  <%if !exception.include?(task.expiration_date) %>
+                    <%exception << examine_time[0][:expiration_date] %>
+                  <%end %>
+                <%end %>
+              <%else %>
+                <%="#{task.body}"%> <%= link_to fa_icon("pencil"), edit_task_path(task.id), title: "Change task", style: "font-size: 18px"%> <%= button_to fa_icon("trash-o"), task_path(task.id), method: :delete, title: "Delete task", style: "font-size: 18px"%>
+              <%end %>
+            </td>
+
+            <td>
+              <%="#{task.expiration_date}"%>
+            </td>
+          </tr>
+        <%end %>
+      <%end %>
+    </table>
+  <% end %>
+
+  <p class="mt" style="text-align: center">
+    <%= link_to "Add task", new_task_path, class: "button button-main"%>
+  </p>
+</div>

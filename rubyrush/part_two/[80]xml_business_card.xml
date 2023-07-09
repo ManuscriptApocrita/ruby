@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<business_card>
+  <information name="Михаил Экзэмпл Экземплович" number="8(928)000-22-80" email="misha.example@mail.ru" about_yourself="beginner in ruby language"></information>
+</business_card>

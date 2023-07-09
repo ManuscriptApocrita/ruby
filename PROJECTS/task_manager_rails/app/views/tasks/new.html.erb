@@ -1,0 +1,15 @@
+<%=image_tag("pokemons.jpg", class: "background") %>
+
+<div class="container" style="border-radius: 10px">
+  <h2 class="title-lg mb">New task</h2>
+
+  <%= form_with model: @task do |form|%>
+    <p><%= form.label :body, "Text of task"%></p>
+    <p><%= form.text_area :body, rows: 5, class: "form-text-area", required: true%></p>
+
+    <p class="mt"><%= form.label :expiration_date%></p>
+    <p><%= form.date_field :expiration_date, class: "form-text-area", required: true%></p>
+
+    <p class="mt"><%= form.submit "Save", class: "button button-main"%></p>
+  <%end%>
+</div>

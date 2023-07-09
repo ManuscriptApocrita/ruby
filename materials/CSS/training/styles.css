@@ -1,0 +1,47 @@
+.red {
+    color: red;
+}
+
+div i {
+    color: green;
+}
+
+.main_link {
+    color: green;
+    text-decoration: none;
+}
+
+.main_link:hover {
+    color: blue;
+    text-decoration: underline;
+    text-decoration-color: red;
+    cursor: pointer;
+}
+
+.main_link:active {
+    text-decoration: line-through;
+}
+
+.main_link:visited {
+    color: gray;
+}
+
+input:focus {
+    color: blue
+}
+
+p.text {
+    color:orange;
+}
+
+#SOME::after {
+    content: "AFTER";
+    color: olive;
+}
+
+body {
+    background: url("https://st.dg-home.ru/upload/iblock/bea/zbhgul1d2d4mrum3s9ibzjwj0swmkbkb/bonsay_derevya_elitnoe_khobbi_s_filosofskim_smyslom_50_vdokhnovlyayushchikh_idey_chokkan_moyogi_hoki.jpg") no-repeat left;
+    background-size: cover;
+    background-attachment: fixed;
+
+}

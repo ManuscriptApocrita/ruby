@@ -1,0 +1,24 @@
+body {
+    color: #131515;
+    font-family: "Times New Roman", Times, serif;
+}
+
+a, button {
+    color: #730E15;
+}
+
+.title-lg {
+    font-size: 200%;
+}
+
+.title-md, .title {
+    font-size: 170%;
+}
+
+.title-sm {
+    font-size: 135%;
+}
+
+.text-sm {
+    font-size: 100%;
+}

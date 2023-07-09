@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<products>
+  <product price='650' stock_item='120'>
+    <mineral color='violet' title='Ametist'/>
+  </product>
+  <product price='1500' stock_item='40'>
+    <mineral color='pink' title='Quartz'/>
+  </product>
+  <product price='99999' stock_item='10'>
+    <mineral color='???' title='Adamantite'/>
+  </product>
+<product price='13' stock_item='100'><mineral color='COLOR' title='TITLE'/></product></products>

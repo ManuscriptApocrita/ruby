@@ -1,0 +1,30 @@
+{
+  "Tb":{
+    "name": "Terbium",
+    "density": "8.23 g/cm³",
+    "year": "1843",
+    "number": 65,
+    "The person who discovered this element is considered": "Mosander"
+  },
+  "Dy":{
+    "name": "Dysprosium",
+    "density": "8.55 g/cm³",
+    "year": "1886",
+    "number": 66,
+    "The person who discovered this element is considered": "de Buabodran"
+  },
+  "Tm":{
+    "name": "Thulium",
+    "density": "9.32 g/cm³",
+    "year": "1879",
+    "number": 69,
+    "The person who discovered this element is considered": "Kleve"
+  },
+  "Xe":{
+    "name": "Xenon",
+    "density": "0.005887 g/cm³",
+    "year": "1898",
+    "number": 54,
+    "The person who discovered this element is considered": "Ramzay and Travers"
+  }
+}

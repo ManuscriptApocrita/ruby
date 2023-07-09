@@ -1,0 +1,14 @@
+.message {
+    position: relative;
+    left: 80%;
+    top: 10%;
+    z-index: 2;
+    border: 1px solid #ffffff;
+    padding: 10px 15px;
+    width: 800px
+}
+
+.message-notice {
+    background-color: #F0E68C;
+    border-color: #DADADA;
+}
