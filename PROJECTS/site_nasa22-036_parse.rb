@@ -4,7 +4,10 @@ require "date"
 
 agent = Mechanize.new
 
-json = agent.get("https://www.nasa.gov/api/2/ubernode/479003") #в этом json лежит всё нужное информационное наполнение
+html_page = agent.get("https://www.nasa.gov/press-release/nasa-invites-media-to-spacex-s-27th-resupply-launch-to-space-station") #сюда можно вставить любой пресс-релиз наса
+scripts = html_page.search("script").text #получаю все скрипты на странице в разметке сайта
+ubernode = scripts.scan(/window.forcedRoute = "(.*)"/)[0][0] #ищу значение определенного скрипта с содержанием совпадения по регулярному выражению с заданной структурой (вне зависимости от пресс релиза везде (вроде как) есть такая строка)
+json = agent.get("https://www.nasa.gov/api/2#{ubernode}") #а далее перенаправление осуществляется по шаблону, нужно просто добавить ubernode
 
 json_processing = JSON.parse(json.body) #для возможности работать с информацией
 
