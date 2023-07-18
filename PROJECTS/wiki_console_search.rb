@@ -1,5 +1,11 @@
 require "mechanize"
 
+def string_cutter(array_chars, number) #беру на вход символы текста без отступов в массиве и число
+  array_chars.each_slice(number) do |group_chars| #число определяет, на каком символе по счету будет перенос
+    puts group_chars.join
+  end
+end
+
 agent = Mechanize.new #взаимодействие с интернетом!
 wiki_main_page = agent.get("https://ru.wikipedia.org/") #загружаю html форму в переменную
 
@@ -11,6 +17,8 @@ search_field = form.field_with(id: "searchInput") #присваиваю пере
 search_field.value = user_input #заполняю строку введенным пользователем значением
 
 result_search_page = agent.submit(form, form.buttons.first) #Поиск состоялся, тут указывается, что на конкретной форме нажимается кнопка
+
+abort "Соответствий по запросу не найдено..." if result_search_page.at(".mw-search-nonefound") != nil #данный класс выводится на странице в случае отсутствия соответствий по запросу, если по такой выборке будет результат nil, то результаты поиска есть, != nil результатов нет
 
 result_search_elements = result_search_page.at(".mw-search-results").search("li").first(8) #ищу в контейнере результатов поиска первые 8 (актуальный поиск), доступно до 20, но более не нужно
 
@@ -29,15 +37,8 @@ result_search_elements.each_with_index do |item, index|
 
   title_array << title #в дальнейшем нужно для перехода к конкретному элементу
 
-  text.each_index do |index| #перебираю все буквы (нужно для переноса)
-    item = text[index]
-    if index % 70 == 1 && index > 1 #первые 70 символов - перенос
-      print "#{item}-\n"
-    else
-      print item #перенос не нужен - продолжается печать символов
-    end
-  end
-  puts "\n\n"
+  string_cutter(text, 75)
+  puts "\n"
 end
 
 puts "Выберите желаемый пункт..."
@@ -57,6 +58,7 @@ else
 end
 
 body = result_element_form.search(".mw-parser-output") #этот класс это контейнер, содержащий результат поиска - вся информация здесь
+
 body = body.search("p") #нужны параграфы, основная информация тут
 
 system("cls") || system("clear")
@@ -64,5 +66,7 @@ system("cls") || system("clear")
 puts "Информация по элементу поиска: \n\n"
 
 body.each do |paragraph| #вывожу ранее собранные параграфы поочередно
-  puts paragraph.text + "\n"
+  string = (paragraph.text).split("")
+  string_cutter(string, 100)
+  puts
 end
