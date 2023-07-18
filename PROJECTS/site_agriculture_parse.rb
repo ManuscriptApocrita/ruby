@@ -2,8 +2,9 @@ require "mechanize"
 require "json"
 
 agent = Mechanize.new
+# agent.set_proxy("000.000.000.000", 8080)
 
-html_page = agent.get("https://agriculture.house.gov/news/documentsingle.aspx?DocumentID=2106/")
+html_page = agent.get("https://agriculture.house.gov/news/documentsingle.aspx?DocumentID=2106")
 
 result_hash = {title: 0, date: 0, location: 0, article: 0}
 
