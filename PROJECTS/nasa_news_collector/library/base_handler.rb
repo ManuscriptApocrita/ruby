@@ -3,6 +3,12 @@ require "json"
 require "yaml"
 require "progress_bar"
 
+class String
+  def colorize(color_code)
+    "\e[#{color_code}m#{self}\e[0m"
+  end
+end
+
 class Base_handler
   def initialize
     @result_hash = {}
@@ -13,6 +19,75 @@ class Base_handler
 
   def entries_size?
     return @entries_size
+  end
+
+  def start_program
+    system("cls") || system("clear")
+    puts "[NASA news collector] " + "version 1.0".colorize(34)
+    puts "\nThis program talks to the NASA server and creates a local copy of all press releases. After the first initialization of the program, it is possible to supplement the database by analyzing what is missing."
+
+    if not @settings["last_update"].empty?
+      time_now = Time.new #создаю переменную с временем, далее буду брать информацию о нём по части
+      last_update_date = Time.parse(@settings["last_update"]) #время созданного пароля
+      logic_answer = ""
+
+      if time_now.year > last_update_date.year #первое, что нужно понять - год, если год последнего обновления меньше, чем сегодняшний - его нужно заменить, месяц прошел точно
+        logic_answer << "you may do update!".colorize(32)
+      else
+        if (time_now.month - last_update_date.month) > 1 #дальше если разница настоящего месяца и последнего обновления больше одного - базу можно обновлять
+          logic_answer << "you may do update!".colorize(32)
+        end
+
+        if (time_now.month - last_update_date.month) == 1 #если разница в один месяц 1, продолжаю проверку
+          if time_now.day == last_update_date.day #дни совпали - месяц прошел
+            logic_answer << "you may do update!".colorize(32)
+          else
+            difference = time_now.day - last_update_date.day
+            if difference.negative? #считаю разницу дней, если она в отрицательном диапазоне, месяц прошел. Если в положительном - показываю оставшиеся дни до завершения
+              logic_answer << "you may do update!".colorize(32)
+            else
+              logic_answer << ("#{difference.to_s} days...").colorize(33)
+            end
+          end
+        elsif (time_now.month - last_update_date.month) == 0 #если разницы нету и один и тот же месяц
+          if time_now.day == last_update_date.day
+            days_to_update = 30
+          else
+            difference = (time_now.day - last_update_date.day)
+            if difference.negative?
+              difference = difference.abs
+            end
+            days_to_update = 30 - difference
+          end
+
+          logic_answer << ("#{days_to_update.to_s} days...").colorize(33)
+        end
+      end
+    end
+
+    if @settings["last_update"].empty?
+      puts "\nYou want to update database? No updates before..."
+    else
+      puts "Warning: it is better to update the database no more than once a month.".colorize(31)
+      puts "\nYou want to update database? Last update was: #{@settings["last_update"]}, until the next recommended update: #{logic_answer}"
+    end
+    puts "\nyes - 1, exit - 0"
+
+    user_input = nil
+    until user_input == 1 || user_input == 0
+      user_input = gets.chomp.to_i
+    end
+
+    if user_input == 0
+      exit
+    else
+      @settings["last_update"] = (Time.new).strftime("%Y-%m-%d")
+      file = File.open(File.dirname(__FILE__ ) + "/settings.json", "w")
+      file.write(JSON.pretty_generate(@settings))
+      file.close
+    end
+
+    system("cls") || system("clear")
   end
 
   def http_request_nasa_server #здесь обращаюсь к серверу и делаю первичные действия с данными
@@ -42,13 +117,20 @@ class Base_handler
             dirname_array << dirname
           end
 
-          dirname_array.each_with_index do |folder, index| #удаляю пустые папки по индексу!!!
+          elements_to_delete = []
+
+          dirname_array.each do |folder| #удаляю пустые папки по индексу!!!
             if Dir.empty?(actual_path + "/#{folder}")
-              dirname_array.delete_at(index)
+              elements_to_delete << folder
             end
           end
 
-          dirname_array.sort! #делаю их упорядоченными
+          if elements_to_delete.size != 0
+            elements_to_delete.each do |element|
+              dirname_array.delete(element)
+            end
+          end
+
           last_change_folder = actual_path + "/#{dirname_array.max}" #выбираю из папок ту, в которой находится самый свежий релиз, второй итерацией я получаю папку месяца в которой находится самый свежий релиз
         end
 
@@ -64,7 +146,8 @@ class Base_handler
         counter = 1
 
         while selector == 0 #время запросов!!
-          http_request = agent.get("https://www.nasa.gov/api/2/ubernode/_search?size=#{counter * 10}&sort=promo-date-time:desc&q=(ubernode-type:press_release)&_source_include=promo-date-time,body,title,release-id,uri") #теперь уже серверная сортировка нужна, получаю десять последних релизов
+          puts "Request ##{counter} to NASA database, please wait, local base are updating..."
+          http_request = agent.get("https://www.nasa.gov/api/2/ubernode/_search?size=#{counter * 24}&sort=promo-date-time:desc&q=(ubernode-type:press_release)&_source_include=promo-date-time,body,title,release-id,uri") #теперь уже серверная сортировка нужна, получаю десять последних релизов
           press_releases = JSON.parse(http_request.body)
 
           press_releases["hits"]["hits"].each do |release|
@@ -75,6 +158,8 @@ class Base_handler
             end
           end
           counter += 1
+
+          sleep(rand(1..3)) #чтобы лишний раз не делать нагрузку на сервер непрерывными запрсоами
         end
       end
     rescue

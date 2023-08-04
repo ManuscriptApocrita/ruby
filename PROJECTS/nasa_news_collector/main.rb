@@ -2,11 +2,25 @@ require_relative "library/base_handler"
 require "tqdm"
 
 base_handler = Base_handler.new
-
+base_handler.start_program
 search_result = base_handler.http_request_nasa_server
-search_result.with_progress(desc: "Reading JSON file...").each_with_index do |release, index|
+
+size = search_result.size
+if size > 1000
+  sleep_value = 0.002
+elsif size < 1000 && size > 500
+  sleep_value = 0.02
+elsif size < 500 && size > 200
+  sleep_value = 0.05
+elsif size < 200 && size > 100
+  sleep_value = 0.1
+elsif size < 100
+  sleep_value = 0.15
+end
+
+search_result.with_progress(desc: "Reading JSON file").each_with_index do |release, index|
   base_handler.processing_press_release(release, index)
-  sleep(0.005)
+  sleep(sleep_value)
 end
 
 base_handler.accumulation_and_branching(search_result)
