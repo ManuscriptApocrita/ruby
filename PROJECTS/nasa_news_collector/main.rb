@@ -7,15 +7,15 @@ search_result = base_handler.http_request_nasa_server
 
 size = search_result.size
 if size > 1000
-  sleep_value = 0.002
+  sleep_value = 0.003
 elsif size < 1000 && size > 500
-  sleep_value = 0.02
+  sleep_value = 0.012
 elsif size < 500 && size > 200
-  sleep_value = 0.05
+  sleep_value = 0.016
 elsif size < 200 && size > 100
-  sleep_value = 0.1
+  sleep_value = 0.019
 elsif size < 100
-  sleep_value = 0.15
+  sleep_value = 0.198
 end
 
 search_result.with_progress(desc: "Reading JSON file").each_with_index do |release, index|

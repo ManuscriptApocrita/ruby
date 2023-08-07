@@ -21,9 +21,23 @@ class Base_handler
     return @entries_size
   end
 
+  def text_processing(string)
+    string.delete!("\r\n\t")
+    string.gsub!("", " ") #в одном релизе есть такие символы
+    string.gsub!("”", "\"") #привожу все кавычки в один стиль
+    string.gsub!("“", "\"")
+    string.gsub!(/['‘’]/, "`")
+    string.gsub!("\u202F", " ") #NNBSP, неразрывный пробел
+    string.gsub!("\u00A0", " ") #NBSP, тоже неразрывный пробел
+    string.gsub!("\u200B", " ") #ZWSP, невидимый символ, который делает пробел без видимого отступа в тексте
+    string.gsub!("\u2028", "") #LSEP, используется для разделения строк
+    string.gsub!("\u00AD", "") #SHY, ­ позволяет браузеру переносить слова на новую строку, если это нужно. в данном случае оно портит текст
+    string.gsub!(/ +/, " ")
+  end
+
   def start_program
     system("cls") || system("clear")
-    puts "[NASA news collector] " + "version 1.0".colorize(34)
+    puts "[NASA news collector] " + "version 1.2".colorize(34)
     puts "\nThis program talks to the NASA server and creates a local copy of all press releases. After the first initialization of the program, it is possible to supplement the database by analyzing what is missing."
 
     if not @settings["last_update"].empty?
@@ -97,6 +111,7 @@ class Base_handler
 
     begin
       if @settings["global_update"] == 0 #если полное обновление базы не производилось (а узнаю я это из файла настроек) - оно выполняется
+        puts "First request to NASA server, please wait, local base are updating..."
         http_request = agent.get("https://www.nasa.gov/api/2/ubernode/_search?size=1&q=(ubernode-type:press_release)") #первым запросом узнаю количество пресс-релизов
         total_releases = JSON.parse(http_request.body)["hits"]["total"] #беру значение того, сколько всего существует в базе записей
         http_request = agent.get("https://www.nasa.gov/api/2/ubernode/_search?size=#{total_releases}&q=(ubernode-type:press_release)&_source_include=promo-date-time,body,title,release-id,uri") #читаю все записи в сокращенном виде плюс без сортировки, и так к серверу обращаюсь с огромным запросом, лишний раз грузить не нужно :-)
@@ -146,7 +161,7 @@ class Base_handler
         counter = 1
 
         while selector == 0 #время запросов!!
-          puts "Request ##{counter} to NASA database, please wait, local base are updating..."
+          puts "Request ##{counter} to NASA server, please wait, local base are updating..."
           http_request = agent.get("https://www.nasa.gov/api/2/ubernode/_search?size=#{counter * 24}&sort=promo-date-time:desc&q=(ubernode-type:press_release)&_source_include=promo-date-time,body,title,release-id,uri") #теперь уже серверная сортировка нужна, получаю десять последних релизов
           press_releases = JSON.parse(http_request.body)
 
@@ -188,17 +203,16 @@ class Base_handler
   end
 
   def processing_press_release(release, iteration)
-    @result_hash[iteration] = {title: 0, date: 0, release_no: 0, article: 0, uri: 0}
+    @result_hash[iteration] = {title: 0, date: 0, release_no: 0, article: 0}
 
     iteration = @result_hash[iteration]
-    iteration[:title] = release["_source"]["title"]
+    iteration[:title] = text_processing(release["_source"]["title"]).strip #в названии статьи бывают лишние символы, обрабатываю
     iteration[:date] = Date.parse(release["_source"]["promo-date-time"]).strftime("%Y-%m-%d")
     if release["_source"]["release-id"] == nil
       iteration[:release_no] = "nothing"
     else
       iteration[:release_no] = release["_source"]["release-id"]
     end
-    iteration[:uri] = release["_source"]["uri"]
 
     paragraphs = Nokogiri::HTML(release["_source"]["body"]).search("p, li") #текст находится в этих двух тэгах, их и беру
 
@@ -207,26 +221,32 @@ class Base_handler
     paragraphs.each do |paragraph| #прохожусь по всему тексту, а именно по каждому тегу в отдельности
       text = (paragraph.text)
 
+      text_processing(text)
+      text = text.strip
+
       if text == "-end-" || text == "- end -" || text == "Back to NASA Newsroom | Back to NASA Homepage" ||
         text == "text-only version of this release" || (/NASA press releases and other information are available automatically/).match?(text) ||
         text.empty? || text.match(/-nasa-/i) || text == "Printer Friendly Version"
         next #избавляюсь от ненужных строк просто пропуская их!
       end
 
-      text.delete!("\r\n\t") #дополнительная обработка текста, лишнее убираю
-      text.gsub!("", " ")
-      text.gsub!("”", "\"")
-      text.gsub!("“", "\"")
-      text.gsub!("'", "`")
-      text.gsub!("’", "`")
-      text.gsub!(" ", " ") #NNBSP
-      text.gsub!("\u00A0", "") #NBSP
-      text.gsub!("\u200B", "") #ZWSP
+      text.gsub!(/-end-|- end -/, "") #выше проверка в некоторых вариантах не работает, рассматривается случай, когда в одном параграфе находится и -end- и другой текст
 
-      if paragraph.name == "li" #если попадается элемент списка, а они идут друг за другом - отступ не нужен
-        article << "*" + text + " "
+      if text.match(/.*RELEASE:.*-/) || text.match(/.*ADVISORY:.*-/) #вариант, где номер релиза помещается в параграф, существует в пару десятках мест, учитываю
+        release_number = text.split.pop #делю строку на массив слов, последний элемент массива - номер релиза
+
+        iteration[:release_no] = release_number
+        next
+      end
+
+      if paragraph.name == "li" #если попадается элемент списка, а они в некоторых случаях уже имеют отступ
+        if text.slice(-1) != "\n" #если отступа нету в конце - добавляю
+          article << "*" + (text << "\n")
+        else
+          article << "*" + text
+        end
       else
-        article << text + "\n"
+        article << text + "\n\n" #привожу в вид по образцу
       end
     end
 
