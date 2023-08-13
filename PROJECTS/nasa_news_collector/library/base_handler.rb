@@ -2,12 +2,7 @@ require "mechanize"
 require "json"
 require "yaml"
 require "progress_bar"
-
-class String
-  def colorize(color_code)
-    "\e[#{color_code}m#{self}\e[0m"
-  end
-end
+require_relative "modifications"
 
 class Base_handler
   def initialize
@@ -21,62 +16,13 @@ class Base_handler
     return @entries_size
   end
 
-  def text_processing(string)
-    string.delete!("\r\n\t")
-    string.gsub!("", " ") #в одном релизе есть такие символы
-    string.gsub!("”", "\"") #привожу все кавычки в один стиль
-    string.gsub!("“", "\"")
-    string.gsub!(/['‘’]/, "`")
-    string.gsub!("\u202F", " ") #NNBSP, неразрывный пробел
-    string.gsub!("\u00A0", " ") #NBSP, тоже неразрывный пробел
-    string.gsub!("\u200B", " ") #ZWSP, невидимый символ, который делает пробел без видимого отступа в тексте
-    string.gsub!("\u2028", "") #LSEP, используется для разделения строк
-    string.gsub!("\u00AD", "") #SHY, ­ позволяет браузеру переносить слова на новую строку, если это нужно. в данном случае оно портит текст
-    string.gsub!(/ +/, " ")
-  end
-
   def start_program
     system("cls") || system("clear")
-    puts "[NASA news collector] " + "version 1.2".colorize(34)
+    puts "[NASA news collector] " + "version 1.4".colorize(34)
     puts "\nThis program talks to the NASA server and creates a local copy of all press releases. After the first initialization of the program, it is possible to supplement the database by analyzing what is missing."
 
     if not @settings["last_update"].empty?
-      time_now = Time.new #создаю переменную с временем, далее буду брать информацию о нём по части
-      last_update_date = Time.parse(@settings["last_update"]) #время созданного пароля
-      logic_answer = ""
-
-      if time_now.year > last_update_date.year #первое, что нужно понять - год, если год последнего обновления меньше, чем сегодняшний - его нужно заменить, месяц прошел точно
-        logic_answer << "you may do update!".colorize(32)
-      else
-        if (time_now.month - last_update_date.month) > 1 #дальше если разница настоящего месяца и последнего обновления больше одного - базу можно обновлять
-          logic_answer << "you may do update!".colorize(32)
-        end
-
-        if (time_now.month - last_update_date.month) == 1 #если разница в один месяц 1, продолжаю проверку
-          if time_now.day == last_update_date.day #дни совпали - месяц прошел
-            logic_answer << "you may do update!".colorize(32)
-          else
-            difference = time_now.day - last_update_date.day
-            if difference.negative? #считаю разницу дней, если она в отрицательном диапазоне, месяц прошел. Если в положительном - показываю оставшиеся дни до завершения
-              logic_answer << "you may do update!".colorize(32)
-            else
-              logic_answer << ("#{difference.to_s} days...").colorize(33)
-            end
-          end
-        elsif (time_now.month - last_update_date.month) == 0 #если разницы нету и один и тот же месяц
-          if time_now.day == last_update_date.day
-            days_to_update = 30
-          else
-            difference = (time_now.day - last_update_date.day)
-            if difference.negative?
-              difference = difference.abs
-            end
-            days_to_update = 30 - difference
-          end
-
-          logic_answer << ("#{days_to_update.to_s} days...").colorize(33)
-        end
-      end
+      logic_answer = remaining_time_analysis(Time.parse(@settings["last_update"]))
     end
 
     if @settings["last_update"].empty?
@@ -194,7 +140,7 @@ class Base_handler
     json_form_releases["hits"]["hits"].each do |release| #пока отбор по части базы, которая более-менее корректно загружается
       link = release["_source"]["uri"]
 
-      if link.match(/^\/press-release\//) #беру все типы ссылок типа "пресс-релиз"
+      if link.match?(/^\/press-release\//) || link.match(/^\/home\//) #беру все типы ссылок типа "пресс-релиз" и теперь еще "home"
         desired_type << release
       end
     end
@@ -204,54 +150,120 @@ class Base_handler
 
   def processing_press_release(release, iteration)
     @result_hash[iteration] = {title: 0, date: 0, release_no: 0, article: 0}
-
     iteration = @result_hash[iteration]
-    iteration[:title] = text_processing(release["_source"]["title"]).strip #в названии статьи бывают лишние символы, обрабатываю
-    iteration[:date] = Date.parse(release["_source"]["promo-date-time"]).strftime("%Y-%m-%d")
-    if release["_source"]["release-id"] == nil
+    title_unprocessed = release["_source"]["title"]
+    date_unprocessed = Date.parse(release["_source"]["promo-date-time"]).strftime("%Y-%m-%d")
+    release_no_unprocessed = release["_source"]["release-id"]
+    text_processing(title_unprocessed); text_processing(date_unprocessed); text_processing(release_no_unprocessed)
+
+    iteration[:title] = title_unprocessed.strip
+    iteration[:date] = date_unprocessed.strip
+
+    if release_no_unprocessed == nil
       iteration[:release_no] = "nothing"
     else
-      iteration[:release_no] = release["_source"]["release-id"]
+      iteration[:release_no] = release_no_unprocessed.strip
     end
 
-    paragraphs = Nokogiri::HTML(release["_source"]["body"]).search("p, li") #текст находится в этих двух тэгах, их и беру
+    body = Nokogiri::HTML(release["_source"]["body"]) #читаю содержание json как сайт, коем оно и является
 
-    article = ""
+    pdf_file = "" #есть два случая, где релиз содержит название файла pdf в особом классе (а текста релиза нету)
+    body.search(".dnd-drop-wrapper").each do |element|
+      if element.text.match?(".pdf")
+        pdf_file << text_processing(element.text).strip
+      end
+    end
 
-    paragraphs.each do |paragraph| #прохожусь по всему тексту, а именно по каждому тегу в отдельности
-      text = (paragraph.text)
+    credits_and_note = body.search(".dnd-atom-wrapper") #в этом классе содержатся картинки и пояснение к ним, по заданию не нужно - удаляю
+    credits_and_note.each do |item|
+      item.remove
+    end
+    body.to_a.reject! { |element| element.parent.nil? } #сохраняю изменения
 
-      text_processing(text)
-      text = text.strip
+    li_elem = body.search("li") #нахожу все элементы списка и делаю их явными для программы, так как далее не будет тэгов, а просто текст
+    li_elem.each do |li|
+      content = "*" + li.content
+      content.sub!(/^\*\W+/, "*") if content.match?(/^\*\W+/) #рассматриваю единственный вариант, где строка начинается с "*" и после неё есть один и более символов, кроме [0-9a-zA-Z_]
+      li.content = content
+    end
 
-      if text == "-end-" || text == "- end -" || text == "Back to NASA Newsroom | Back to NASA Homepage" ||
-        text == "text-only version of this release" || (/NASA press releases and other information are available automatically/).match?(text) ||
-        text.empty? || text.match(/-nasa-/i) || text == "Printer Friendly Version"
-        next #избавляюсь от ненужных строк просто пропуская их!
+    br_elem = body.search("br") #br элементы - это символ переноса на новую строку, так есть в форме релиза
+    br_elem.each do |br|
+      br.name = "p"
+      br.content = "LINE_CUT#" #для дальнейшей замены на нужные символы
+    end
+
+    body_text = body.text
+    if body_text.match?("LINE_CUT#")
+      body_text.gsub!("LINE_CUT#", "\n")
+    end
+
+    result_text = ""
+
+    array_of_text_elements = body_text.split(/\n/)
+    array_of_text_elements.each do |element|
+      text_processing(element)
+
+      if element.match?(/^[\r\n\t]|[\r\n\t]$/) #если strip нужен - я его применяю
+        element.strip!
+      end
+    end
+
+    array_of_text_elements.reject! do |element| #просматриваю каждый элемент массива и удаляю элемент при совпадении с правилом
+      element == " " ||
+        element == nil ||
+        element == " " ||
+        element == "" ||
+        element == "text-only version of this release" ||
+        element == "Printer Friendly Version" ||
+        element == "Back to NASA Newsroom | Back to NASA Homepage" ||
+        element == "-end-" || element == "- end-" ||
+        element == "-end -" || element == "- end -" ||
+        element.match?(/NASA press releases and other information are available automatically by sending a blank e-mail message/) && array_of_text_elements.size > 1
+    end
+
+    array_of_text_elements.each_with_index do |element, index|
+      if element.start_with?("-") || element.start_with?("·") #вариант, где список элемента не помещен в специальный тэг - и является простым текстом
+        element.slice!(0)
+        element = element.strip
+        element.insert(0, "*")
+        element.sub!(/^\*\W+/, "*") if element.match?(/^\*\W+/)
+      elsif element.start_with?("*")
+        element.sub!(/^\*\W+/, "*") if element.match?(/^\*\W+/)
       end
 
-      text.gsub!(/-end-|- end -/, "") #выше проверка в некоторых вариантах не работает, рассматривается случай, когда в одном параграфе находится и -end- и другой текст
+      item_text = element.strip
 
-      if text.match(/.*RELEASE:.*-/) || text.match(/.*ADVISORY:.*-/) #вариант, где номер релиза помещается в параграф, существует в пару десятках мест, учитываю
-        release_number = text.split.pop #делю строку на массив слов, последний элемент массива - номер релиза
+      if element.match?(/.*RELEASE:.*-/) || element.match?(/.*ADVISORY:.*-/) && array_of_text_elements.size > 1 #с match нужно работать осторожно, ведь элементом может загрузиться весь body, поэтому усложняю проверку
+        release_number = element.split.pop #делю строку на массив слов, последний элемент массива - номер релиза
+        text_processing(release_number)
 
-        iteration[:release_no] = release_number
+        iteration[:release_no] = release_number.strip #вариант, где номер релиза помещается в параграф, существует в пару десятках мест, учитываю
         next
       end
 
-      if paragraph.name == "li" #если попадается элемент списка, а они в некоторых случаях уже имеют отступ
-        if text.slice(-1) != "\n" #если отступа нету в конце - добавляю
-          article << "*" + (text << "\n")
-        else
-          article << "*" + text
+      if item_text.start_with?("*") #если элемент текста - элемент списка
+        if item_text == "*" #в случае, если забыли добавить текст к элементу списка, один раз такое было
+          result_text << "\n"
+          next
+        end
+
+        if not array_of_text_elements[index + 1].nil? #чтобы проверка не ушла туда, куда не нужно
+          if !array_of_text_elements[index + 1].start_with?(/[*\-·]/) #если следующий элемент - не элемент списка, то делаю увеличенный отступ, в другом случае укороченный
+            result_text << item_text + "\n\n"
+          else
+            result_text << item_text + "\n"
+          end
         end
       else
-        article << text + "\n\n" #привожу в вид по образцу
+        result_text << item_text + "\n\n"
       end
     end
 
-    article.slice!(-1) if article.end_with?("\n") #убираю последний пробел, если он есть
-    iteration[:article] = article
+    iteration[:article] = result_text.strip
+    if !pdf_file.empty? && result_text.empty?
+      iteration[:article] = pdf_file
+    end
   end
 
   def accumulation_and_branching(array)
@@ -295,6 +307,7 @@ class Base_handler
           Dir.mkdir(month_folder_path)
         end
 
+        sleep_value = delay_value(array_of_releases.size, 1)
         array_of_releases.each do |release|
 
           date_of_release = Date.parse(release[1][:date].to_s)
@@ -329,11 +342,7 @@ class Base_handler
             end
 
             bar.increment! #обновляю статусную строку, добавляю незначительные задержки, так интереснее :-)
-            if rand(2) == 1
-              sleep(0.005)
-            else
-              sleep(0.01)
-            end
+            sleep(sleep_value)
 
           end
         end
