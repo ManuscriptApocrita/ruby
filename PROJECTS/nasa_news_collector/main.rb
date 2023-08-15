@@ -3,7 +3,9 @@ require "tqdm"
 
 base_handler = Base_handler.new
 base_handler.start_program
-search_result = base_handler.http_request_nasa_server
+initialize_request = base_handler.http_request_nasa_server
+unknown_types = initialize_request[0]
+search_result = initialize_request[1]
 
 size = search_result.size
 sleep_value = delay_value(size, 0)
@@ -20,4 +22,8 @@ if entries_size > 0
   puts "#{entries_size} entries have been added!"
 else
   puts "Your database is up to date! No changes were made..."
+end
+
+if unknown_types.size != 0
+  base_handler.exception_logging(unknown_types)
 end

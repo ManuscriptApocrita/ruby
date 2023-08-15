@@ -18,7 +18,7 @@ class Base_handler
 
   def start_program
     system("cls") || system("clear")
-    puts "[NASA news collector] " + "version 1.4".colorize(34)
+    puts "[NASA news collector] " + "version 2.0".colorize(35)
     puts "\nThis program talks to the NASA server and creates a local copy of all press releases. After the first initialization of the program, it is possible to supplement the database by analyzing what is missing."
 
     if not @settings["last_update"].empty?
@@ -28,7 +28,7 @@ class Base_handler
     if @settings["last_update"].empty?
       puts "\nYou want to update database? No updates before..."
     else
-      puts "Warning: it is better to update the database no more than once a month.".colorize(31)
+      puts "\nAdvice: it is better to update the database no more than once a week.".underline
       puts "\nYou want to update database? Last update was: #{@settings["last_update"]}, until the next recommended update: #{logic_answer}"
     end
     puts "\nyes - 1, exit - 0"
@@ -136,16 +136,37 @@ class Base_handler
 
     json_form_releases = JSON.parse(http_request.body) #запрос выше был совершен, парсинг данных!
 
-    desired_type = []
-    json_form_releases["hits"]["hits"].each do |release| #пока отбор по части базы, которая более-менее корректно загружается
-      link = release["_source"]["uri"]
+    all_pass_releases = []
+    unrecognized_types = []
+    known_types = %w(press-release centers home press larc langley wallops
+    mission_pages exploration Wallops ames marshall directorates feature archive
+    news spacetech topics beta release stem v center enters 8k-science)
 
-      if link.match?(/^\/press-release\//) || link.match(/^\/home\//) #беру все типы ссылок типа "пресс-релиз" и теперь еще "home"
-        desired_type << release
+    json_form_releases["hits"]["hits"].each do |release| #отбор производится по всем разновидностям пресс релизов, которые известны на момент середины 2023 года
+      link = release["_source"]["uri"]
+      link = link.split(/\//).reject { |item| item.empty? }
+
+      if known_types.include?(link[0])
+        all_pass_releases << release
+      else
+        unrecognized_types << "#{link[0]}(#{release["_source"]["title"]})"
       end
     end
 
-    return desired_type
+    return [unrecognized_types, all_pass_releases]
+  end
+
+  def exception_logging(unrecognized_types)
+    puts "\nFound unknown types of releases: #{unrecognized_types.size}, the database was not filled with them, contact the vendor of the program to analyze the log file."
+
+    log_file = JSON.parse(File.read(File.dirname(__FILE__ ) + "/log.json"))
+    unrecognized_types.each do |element|
+      log_file["unknown_types"] << element if not log_file["unknown_types"].include?(element)
+    end
+
+    file = File.open(File.dirname(__FILE__ ) + "/log.json", "w")
+    file.write(JSON.pretty_generate(log_file))
+    file.close
   end
 
   def processing_press_release(release, iteration)
@@ -168,10 +189,10 @@ class Base_handler
     body = Nokogiri::HTML(release["_source"]["body"]) #читаю содержание json как сайт, коем оно и является
 
     pdf_file = "" #есть два случая, где релиз содержит название файла pdf в особом классе (а текста релиза нету)
-    body.search(".dnd-drop-wrapper").each do |element|
-      if element.text.match?(".pdf")
-        pdf_file << text_processing(element.text).strip
-      end
+    dnd_drop_wrapper_text = body.search(".dnd-drop-wrapper").text
+    if dnd_drop_wrapper_text != nil
+      dnd_drop_wrapper_text.match?(".pdf")
+      pdf_file << dnd_drop_wrapper_text.strip
     end
 
     credits_and_note = body.search(".dnd-atom-wrapper") #в этом классе содержатся картинки и пояснение к ним, по заданию не нужно - удаляю
@@ -204,7 +225,7 @@ class Base_handler
     array_of_text_elements.each do |element|
       text_processing(element)
 
-      if element.match?(/^[\r\n\t]|[\r\n\t]$/) #если strip нужен - я его применяю
+      if element.match?(/^\s|[\r\n\t]|\s$/) #если strip нужен - я его применяю
         element.strip!
       end
     end
@@ -217,24 +238,34 @@ class Base_handler
         element == "text-only version of this release" ||
         element == "Printer Friendly Version" ||
         element == "Back to NASA Newsroom | Back to NASA Homepage" ||
-        element == "-end-" || element == "- end-" ||
-        element == "-end -" || element == "- end -" ||
-        element.match?(/NASA press releases and other information are available automatically by sending a blank e-mail message/) && array_of_text_elements.size > 1
+        element == "For more information about Langley go to www.nasa.gov/langley" ||
+        element == "For more information or to learn about other happenings at NASA`s Marshall Space Flight Center, visit NASA Marshall" ||
+        element.match?(/\s?( -)?(- )?(– )?–?-?end-?–?( –)?( -)?(- )?\s?/i) && element.size < 12 ||
+        element.match?(/\s?( -)?(- )?(– )?–?-?nasa-?–?( –)?( -)?(- )?\s?/i) && element.size < 12 ||
+        element.match?(/For more information or to learn about other happenings at NASA`s Marshall Space Flight Center/) && element.size < 175 || #достаточно обозначить часть строки для её нахождения, указания размера строки делает удаление более безопасным
+        element.match?(/NASA press releases and other information are available automatically by sending a blank e-mail/) && element.size < 270 ||
+        element.match?(/To receive status reports and news releases issued from the Dryden Newsroom electronically, send a blank/) && element.size < 310 ||
+        element.match?(/To receive status reports and news releases issued from the Kennedy Space Center Newsroom electronically, send a blank/) && element.size < 315 ||
+        element.match?(/NASA Marshall Space Flight Center news releases and other information are available automatically by sending/) && element.size < 205 ||
+        element.match?(/To unsubscribe, send an e-mail message with the subject line unsubscribe to msfc-request@newsletters.nasa.gov./) && element.size < 120 ||
+        element.match?(/NASA ((Langley)?|(news)?) ((press)?|(releases)?|(news)?)( releases)? are available( automatically)? by sending an e-?mail message to Langley-news-request@lists.nasa.gov\s?with the word "?subscribe"? in the subject line. You will receive an e-?mail ((instructing)?|(asking)?) you to ((reply)?|(visit)?)( a link)? to confirm the action. To unsubscribe, send an e-?mail message to Langley-news-request@lists.nasa.gov with the word "?unsubscribe"? in the subject line./i) && element.size < 410  #чтобы не удалить строку, в которой есть еще информация помимо статичной строки, число после size = размер статичной строки + небольшой запас
     end
 
     array_of_text_elements.each_with_index do |element, index|
-      if element.start_with?("-") || element.start_with?("·") #вариант, где список элемента не помещен в специальный тэг - и является простым текстом
-        element.slice!(0)
-        element = element.strip
-        element.insert(0, "*")
-        element.sub!(/^\*\W+/, "*") if element.match?(/^\*\W+/)
-      elsif element.start_with?("*")
-        element.sub!(/^\*\W+/, "*") if element.match?(/^\*\W+/)
-      end
-
       item_text = element.strip
 
-      if element.match?(/.*RELEASE:.*-/) || element.match?(/.*ADVISORY:.*-/) && array_of_text_elements.size > 1 #с match нужно работать осторожно, ведь элементом может загрузиться весь body, поэтому усложняю проверку
+      if item_text.start_with?("-") || item_text.start_with?("·") || item_text.start_with?("•") || item_text.start_with?("›") || item_text.start_with?("o") #вариант, где список элемента не помещен в специальный тэг - и является простым текстом
+        item_text.slice!(0)
+        item_text = item_text.strip
+        item_text.insert(0, "*")
+        item_text.sub!(/^\*\W+/, "*") if item_text.match?(/^\*\W+/)
+      elsif item_text.start_with?("*")
+        item_text.sub!(/^\*\W+/, "*") if item_text.match?(/^\*\W+/)
+      end
+
+      if item_text.match?(/.*RELEASE:.*-/) && item_text.size < 40  ||
+        item_text.match?(/.*ADVISORY:.*-/) && item_text.size < 40  ||
+        item_text.match?(/.*Release:.*-/) && item_text.size < 40  || item_text.match?(/.*MEDIA ADVISORY:?.*-/) && item_text.size < 40
         release_number = element.split.pop #делю строку на массив слов, последний элемент массива - номер релиза
         text_processing(release_number)
 
@@ -249,7 +280,7 @@ class Base_handler
         end
 
         if not array_of_text_elements[index + 1].nil? #чтобы проверка не ушла туда, куда не нужно
-          if !array_of_text_elements[index + 1].start_with?(/[*\-·]/) #если следующий элемент - не элемент списка, то делаю увеличенный отступ, в другом случае укороченный
+          if !array_of_text_elements[index + 1].start_with?(/[*\-·•›o–]/) #если следующий элемент - не элемент списка, то делаю увеличенный отступ, в другом случае укороченный
             result_text << item_text + "\n\n"
           else
             result_text << item_text + "\n"
@@ -298,7 +329,7 @@ class Base_handler
       end
 
       puts "Examine yaml files... processing #{year} year - #{array_of_releases.size} elements" #красивый информационный элемент!
-      bar = ProgressBar.new(array_of_releases.size, :bar, :percentage, :eta, :rate) #выбираю нужные элементы бара
+      bar = ProgressBar.new(array_of_releases.size, :bar, :percentage, :counter) #выбираю нужные элементы бара
 
       @all_months.each_with_index do |month, index|
         month_folder_path = year_folder + "/[#{index + 1}]##{month}"
